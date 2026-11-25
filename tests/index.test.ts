@@ -1544,7 +1544,7 @@ test("names a model override in status only when it sets enabled", async () => {
 	]);
 });
 
-test("warns once about model overrides that do not apply", async () => {
+test("warns at session start about model overrides that do not apply", async () => {
 	const harness = createHarness({
 		globalSettings: {
 			contextPaging: {
@@ -1561,7 +1561,6 @@ test("warns once about model overrides that do not apply", async () => {
 	const known = new Set(["a/known", "openrouter/deep/seek", "a/bad"]);
 	(harness.ctx as any).modelRegistry = { find: (provider: string, id: string) => known.has(`${provider}/${id}`) ? {} : undefined };
 	await emit(harness, "session_start", { reason: "startup" });
-	await emit(harness, "session_start", { reason: "resume" });
 	const warnings = harness.notifications.filter((item) => item.level === "warning");
 	assert.deepEqual(warnings.map((item) => item.message), [
 		"Context paging ignores these settings:\n"

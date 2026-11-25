@@ -155,7 +155,7 @@ export default function contextPagingExtension(
 		warnedSettingPairs.add(pair);
 		ctx.ui.notify(`Context paging tokenBudget=${tokenBudget}, trimToTokens=${trimToTokens} leaves no headroom. A smaller trimToTokens restores room between cuts.`, "warning");
 	};
-	const warnedSettingProblems = new Set<string>();
+	// Pi creates a new extension instance for each session, so each session warns once.
 	const warnAboutSettingProblems = (ctx: ExtensionContext) => {
 		const problems = [...resolvedSettings.settingProblems];
 		const registry = ctx.modelRegistry as ExtensionContext["modelRegistry"] | undefined;
@@ -169,8 +169,7 @@ export default function contextPagingExtension(
 			}
 		}
 		const message = problems.map((problem) => `- ${problem}`).join("\n");
-		if (message === "" || warnedSettingProblems.has(message)) return;
-		warnedSettingProblems.add(message);
+		if (message === "") return;
 		ctx.ui.notify(`Context paging ignores these settings:\n${message}`, "warning");
 	};
 	let visibleHistoryIds: string[] = [];
