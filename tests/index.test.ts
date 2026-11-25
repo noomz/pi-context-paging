@@ -1543,21 +1543,3 @@ test("names a model override in status only when it sets enabled", async () => {
 		"Context paging is disabled for a/off by its model override.",
 	]);
 });
-
-test("sizes an auto budget from the running model window", async () => {
-	const harness = createHarness({
-		globalSettings: { contextPaging: { enabled: true, tokenBudget: "auto:0.5" } },
-		projectTrusted: false,
-	});
-	const old = user(`OLD ${"x".repeat(2_000)}`);
-	const actual = user("ACTUAL");
-	const selectFor = async (id: string, contextWindow: number) => {
-		const model = { provider: "p", id, contextWindow };
-		harness.ctx.model = model as any;
-		await emit(harness, "model_select", { model });
-		harness.setBranch([entry("old", old), entry("actual", actual)]);
-		return (await emit(harness, "context", { messages: [old, actual] }) as any).messages;
-	};
-	assert.equal(hasMarker(await selectFor("small", 600), "OLD"), false);
-	assert.equal(hasMarker(await selectFor("large", 64_000), "OLD"), true);
-});

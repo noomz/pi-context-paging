@@ -193,47 +193,14 @@ test("ignores invalid model token values", () => {
 	}
 });
 
-test("resolves an auto budget as a fraction of the model window", () => {
-	const resolve = (tokenBudget: unknown, contextWindow?: number, modelKey?: string) => {
+test("ignores a window-relative budget string at every level", () => {
+	for (const ratio of ["auto", "auto:0.5"]) {
 		const settings = resolveContextPagingSettings({
-			globalSettings: { contextPaging: { tokenBudget, modelOverrides: { "a/one": { tokenBudget: "auto:0.25" } } } },
-			projectTrusted: false,
-		});
-		const { tokenBudget: budget, trimToTokens, trimToTokensExplicit } = settingsForModel(settings, modelKey, contextWindow);
-		return { budget, trimToTokens, trimToTokensExplicit };
-	};
-	assert.deepEqual(resolve("auto", 200_000), { budget: 100_000, trimToTokens: 62_500, trimToTokensExplicit: false });
-	assert.deepEqual(resolve("auto:0.4", 1_000_000), { budget: 400_000, trimToTokens: 250_000, trimToTokensExplicit: false });
-	assert.deepEqual(resolve("auto:1", 32_768), { budget: 32_768, trimToTokens: 20_480, trimToTokensExplicit: false });
-	assert.deepEqual(resolve("auto", undefined), { budget: 128_000, trimToTokens: 80_000, trimToTokensExplicit: false });
-	assert.deepEqual(resolve("auto", Number.NaN), { budget: 128_000, trimToTokens: 80_000, trimToTokensExplicit: false });
-	assert.deepEqual(resolve(96_000, 200_000, "a/one"), { budget: 50_000, trimToTokens: 31_250, trimToTokensExplicit: false });
-	assert.deepEqual(resolve("auto", 200_000, "b/two"), { budget: 100_000, trimToTokens: 62_500, trimToTokensExplicit: false });
-});
-
-test("keeps the numeric resolved budget and adds the auto ratio", () => {
-	const settings = resolveContextPagingSettings({ globalSettings: { contextPaging: { tokenBudget: "auto:0.4" } }, projectTrusted: false });
-	assert.equal(settings.tokenBudget, 128_000);
-	assert.equal(settings.trimToTokens, 80_000);
-	assert.equal(settings.tokenBudgetAutoRatio, 0.4);
-	assert.equal(resolveContextPagingSettings({ globalSettings: {}, projectTrusted: false }).tokenBudgetAutoRatio, undefined);
-});
-
-test("keeps an explicit target with an auto budget", () => {
-	const settings = resolveContextPagingSettings({
-		globalSettings: { contextPaging: { tokenBudget: "auto", trimToTokens: 30_000 } }, projectTrusted: false,
-	});
-	const { tokenBudget, trimToTokens, trimToTokensExplicit } = settingsForModel(settings, undefined, 200_000);
-	assert.deepEqual({ tokenBudget, trimToTokens, trimToTokensExplicit }, { tokenBudget: 100_000, trimToTokens: 30_000, trimToTokensExplicit: true });
-});
-
-test("falls through invalid auto budgets to the next source", () => {
-	for (const invalid of ["Auto", "auto:", "auto: ", "auto:0", "auto:-0.5", "auto:1.5", "auto:x", "auto:NaN", "auto:Infinity", "0.5", ""]) {
-		const settings = resolveContextPagingSettings({
-			globalSettings: { contextPaging: { tokenBudget: "auto:0.25", modelOverrides: { "a/one": { tokenBudget: invalid } } } },
-			projectSettings: { contextPaging: { tokenBudget: invalid } },
+			globalSettings: { contextPaging: { tokenBudget: 96_000, modelOverrides: { "a/one": { tokenBudget: ratio } } } },
+			projectSettings: { contextPaging: { tokenBudget: ratio } },
 			projectTrusted: true,
 		});
-		assert.equal(settingsForModel(settings, "a/one", 200_000).tokenBudget, 50_000, `invalid budget: ${JSON.stringify(invalid)}`);
+		assert.equal(settings.tokenBudget, 96_000, `top-level budget: ${ratio}`);
+		assert.equal(settingsForModel(settings, "a/one").tokenBudget, 96_000, `model budget: ${ratio}`);
 	}
 });

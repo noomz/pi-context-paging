@@ -125,8 +125,7 @@ export default function contextPagingExtension(
 		: resolveContextPagingSettings({ globalSettings: { contextPaging: { enabled: false } }, projectTrusted: false });
 	let sessionEnabled: boolean | undefined;
 	let activeModelKey: string | undefined;
-	const modelSettings = (ctx?: ExtensionContext) =>
-		settingsForModel(resolvedSettings, activeModelKey, ctx?.model?.contextWindow);
+	const modelSettings = () => settingsForModel(resolvedSettings, activeModelKey);
 	const isEnabled = () => sessionEnabled ?? modelSettings().enabled;
 	const publishStatus = (ctx: ExtensionContext) => {
 		if (ctx.hasUI) ctx.ui.setStatus("context-paging", isEnabled() ? "paging on" : "paging off");
@@ -149,7 +148,7 @@ export default function contextPagingExtension(
 		pendingRotation = undefined;
 	};
 	const warnAboutTrimTarget = (ctx: ExtensionContext) => {
-		const { tokenBudget, trimToTokens, trimToTokensExplicit } = modelSettings(ctx);
+		const { tokenBudget, trimToTokens, trimToTokensExplicit } = modelSettings();
 		if (!isEnabled() || !trimToTokensExplicit || trimToTokens < tokenBudget) return;
 		const pair = `${tokenBudget}:${trimToTokens}`;
 		if (warnedSettingPairs.has(pair)) return;
@@ -216,7 +215,7 @@ export default function contextPagingExtension(
 			const action = args.trim();
 			if (action === "stats") {
 				try {
-					ctx.ui.notify(await contextPagingStats(ctx, isEnabled(), modelSettings(ctx).tokenBudget, latestInput), "info");
+					ctx.ui.notify(await contextPagingStats(ctx, isEnabled(), modelSettings().tokenBudget, latestInput), "info");
 				} catch (error) {
 					ctx.ui.notify(`Context paging stats are unavailable: ${errorMessage(error)}`, "warning");
 				}
@@ -232,7 +231,7 @@ export default function contextPagingExtension(
 					ctx.ui.notify("Context paging is disabled for this session.", "warning");
 					return;
 				}
-				const { tokenBudget, trimToTokens } = modelSettings(ctx);
+				const { tokenBudget, trimToTokens } = modelSettings();
 				const requested = rotateCommand.trimToTokens ?? trimToTokens;
 				// selectContext caps the target at the budget, so a target at or above it would rotate nothing.
 				if (tokenBudget <= requested) {
@@ -345,7 +344,7 @@ export default function contextPagingExtension(
 			const contextTokens = usageTracker.prepare(
 				event.messages, residentTokens, ctx.getContextUsage()?.tokens, canonicalSessionMessages ?? [],
 			);
-			const { tokenBudget, trimToTokens } = modelSettings(ctx);
+			const { tokenBudget, trimToTokens } = modelSettings();
 			const selectionLimits = {
 				modelContextWindow: ctx.model?.contextWindow,
 				tokenBudget,
