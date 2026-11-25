@@ -162,12 +162,12 @@ export default function contextPagingExtension(
 			const slash = modelKey.indexOf("/");
 			const known = slash > 0 && ctx.modelRegistry.find(modelKey.slice(0, slash), modelKey.slice(slash + 1)) !== undefined;
 			if (!known) {
-				problems.push(`contextPaging.modelOverrides[${JSON.stringify(modelKey)}] does not match a known provider/modelId.`);
+				problems.push(`contextPaging.modelOverrides[${JSON.stringify(modelKey)}] matches no model Pi knows at session start.`);
 			}
 		}
 		const message = problems.map((problem) => `- ${problem}`).join("\n");
 		if (message === "") return;
-		ctx.ui.notify(`Context paging ignores these settings:\n${message}`, "warning");
+		ctx.ui.notify(`Context paging found problems in these settings:\n${message}`, "warning");
 	};
 	let visibleHistoryIds: string[] = [];
 	let invalidatingBranchEntries = new Set<string>();

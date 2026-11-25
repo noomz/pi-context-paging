@@ -1564,9 +1564,9 @@ test("warns at session start about model overrides that do not apply", async () 
 	await emit(harness, "session_start", { reason: "startup" });
 	const warnings = harness.notifications.filter((item) => item.level === "warning");
 	assert.deepEqual(warnings.map((item) => item.message), [
-		"Context paging ignores these settings:\n"
+		"Context paging found problems in these settings:\n"
 			+ '- global contextPaging.modelOverrides["a/bad"].enabled must be true or false.\n'
-			+ '- contextPaging.modelOverrides["a/typo"] does not match a known provider/modelId.',
+			+ '- contextPaging.modelOverrides["a/typo"] matches no model Pi knows at session start.',
 	]);
 });
 

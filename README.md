@@ -137,7 +137,7 @@ If an override sets `tokenBudget` but not `trimToTokens`, the target is 5/8 of t
 A trusted project override replaces the global override field by field for the same model. Other global overrides still apply.
 A field with an invalid value does not apply.
 At session start, the extension shows one warning that lists override values that do not apply, unknown override fields such as `enable`, and keys that match no model Pi knows.
-A provider that an extension registers after session start can cause a key warning for its models.
+A provider that an extension registers after session start can cause a key warning for its models. The override still applies once that model is active.
 
 The extension checks the active model at session start and after every model change.
 For `enabled`, the order is the session command, then the override for the active model, then `enabled`, then the default.
