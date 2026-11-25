@@ -155,6 +155,24 @@ export default function contextPagingExtension(
 		warnedSettingPairs.add(pair);
 		ctx.ui.notify(`Context paging tokenBudget=${tokenBudget}, trimToTokens=${trimToTokens} leaves no headroom. A smaller trimToTokens restores room between cuts.`, "warning");
 	};
+	const warnedSettingProblems = new Set<string>();
+	const warnAboutSettingProblems = (ctx: ExtensionContext) => {
+		const problems = [...resolvedSettings.settingProblems];
+		const registry = ctx.modelRegistry as ExtensionContext["modelRegistry"] | undefined;
+		if (registry) {
+			for (const modelKey of resolvedSettings.modelOverrides.keys()) {
+				const slash = modelKey.indexOf("/");
+				const known = slash > 0 && registry.find(modelKey.slice(0, slash), modelKey.slice(slash + 1)) !== undefined;
+				if (!known) {
+					problems.push(`contextPaging.modelOverrides[${JSON.stringify(modelKey)}] does not match a known provider/modelId.`);
+				}
+			}
+		}
+		const message = problems.map((problem) => `- ${problem}`).join("\n");
+		if (message === "" || warnedSettingProblems.has(message)) return;
+		warnedSettingProblems.add(message);
+		ctx.ui.notify(`Context paging ignores these settings:\n${message}`, "warning");
+	};
 	let visibleHistoryIds: string[] = [];
 	let invalidatingBranchEntries = new Set<string>();
 	let omittedFailureEntries = new Set<string>();
@@ -291,6 +309,7 @@ export default function contextPagingExtension(
 		} finally {
 			publishStatus(ctx);
 		}
+		warnAboutSettingProblems(ctx);
 		refreshSafely(ctx, true);
 	});
 	pi.on("session_shutdown", (_event, ctx) => {

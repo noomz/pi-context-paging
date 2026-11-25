@@ -204,3 +204,40 @@ test("ignores a window-relative budget string at every level", () => {
 		assert.equal(settingsForModel(settings, "a/one").tokenBudget, 96_000, `model budget: ${ratio}`);
 	}
 });
+
+test("reports model override values that do not apply", () => {
+	const settings = resolveContextPagingSettings({
+		globalSettings: {
+			contextPaging: {
+				modelOverrides: {
+					"a/one": { enabled: "false", tokenBudget: 0, trimToTokens: "80000" },
+					"a/two": { enable: false },
+					"a/three": true,
+					"a/ok": { enabled: false, tokenBudget: 64_000, trimToTokens: 40_000 },
+				},
+			},
+		},
+		projectSettings: { contextPaging: { modelOverrides: [] } },
+		projectTrusted: true,
+	});
+	assert.deepEqual(settings.settingProblems, [
+		'global contextPaging.modelOverrides["a/one"].enabled must be true or false.',
+		'global contextPaging.modelOverrides["a/one"].tokenBudget must be a positive integer.',
+		'global contextPaging.modelOverrides["a/one"].trimToTokens must be a positive integer.',
+		'global contextPaging.modelOverrides["a/two"] has an unknown field "enable".',
+		'global contextPaging.modelOverrides["a/three"] must be an object.',
+		"project contextPaging.modelOverrides must be an object.",
+	]);
+	assert.equal(settingsForModel(settings, "a/ok").enabled, false);
+});
+
+test("reports no problems for valid or absent model overrides", () => {
+	for (const contextPaging of [{}, { modelOverrides: {} }, { modelOverrides: { "a/one": { enabled: true } } }]) {
+		const settings = resolveContextPagingSettings({ globalSettings: { contextPaging }, projectTrusted: false });
+		assert.deepEqual(settings.settingProblems, []);
+	}
+	const untrusted = resolveContextPagingSettings({
+		globalSettings: {}, projectSettings: { contextPaging: { modelOverrides: true } }, projectTrusted: false,
+	});
+	assert.deepEqual(untrusted.settingProblems, [], "untrusted project settings are ignored, not reported");
+});

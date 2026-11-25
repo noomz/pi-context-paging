@@ -13,6 +13,8 @@ export type ResolvedContextPagingSettings = {
 	trimToTokensExplicit: boolean;
 	/** Per-model overrides keyed by exact `provider/modelId`, merged field by field. */
 	modelOverrides: ReadonlyMap<string, ContextPagingModelOverride>;
+	/** Override values that do not apply, so the extension can report them once. */
+	settingProblems: readonly string[];
 };
 
 export type ContextPagingModelOverride = {
@@ -21,7 +23,7 @@ export type ContextPagingModelOverride = {
 	trimToTokens?: number;
 };
 
-export type ContextPagingModelSettings = Omit<ResolvedContextPagingSettings, "modelOverrides"> & {
+export type ContextPagingModelSettings = Omit<ResolvedContextPagingSettings, "modelOverrides" | "settingProblems"> & {
 	/** True when the active model's override set `enabled`. */
 	enabledByModelOverride: boolean;
 };
@@ -30,18 +32,38 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function readModelOverrides(settings: unknown, into: Map<string, ContextPagingModelOverride>): void {
+const MODEL_OVERRIDE_FIELDS = new Set(["enabled", "tokenBudget", "trimToTokens"]);
+
+function readModelOverrides(
+	settings: unknown,
+	source: "global" | "project",
+	into: Map<string, ContextPagingModelOverride>,
+	problems: string[],
+): void {
 	if (!isRecord(settings) || !isRecord(settings.contextPaging)) return;
 	const overrides = settings.contextPaging.modelOverrides;
-	if (!isRecord(overrides)) return;
+	if (overrides === undefined) return;
+	if (!isRecord(overrides)) {
+		problems.push(`${source} contextPaging.modelOverrides must be an object.`);
+		return;
+	}
 	for (const [modelKey, override] of Object.entries(overrides)) {
-		if (!isRecord(override)) continue;
+		const path = `${source} contextPaging.modelOverrides[${JSON.stringify(modelKey)}]`;
+		if (!isRecord(override)) {
+			problems.push(`${path} must be an object.`);
+			continue;
+		}
 		const merged = { ...into.get(modelKey) };
 		if (typeof override.enabled === "boolean") merged.enabled = override.enabled;
-		const tokenBudget = readTokenValue(override, "tokenBudget");
-		if (tokenBudget !== undefined) merged.tokenBudget = tokenBudget;
-		const trimToTokens = readTokenValue(override, "trimToTokens");
-		if (trimToTokens !== undefined) merged.trimToTokens = trimToTokens;
+		else if (override.enabled !== undefined) problems.push(`${path}.enabled must be true or false.`);
+		for (const key of ["tokenBudget", "trimToTokens"] as const) {
+			const value = readTokenValue(override, key);
+			if (value !== undefined) merged[key] = value;
+			else if (override[key] !== undefined) problems.push(`${path}.${key} must be a positive integer.`);
+		}
+		for (const field of Object.keys(override)) {
+			if (!MODEL_OVERRIDE_FIELDS.has(field)) problems.push(`${path} has an unknown field ${JSON.stringify(field)}.`);
+		}
 		into.set(modelKey, merged);
 	}
 }
@@ -104,8 +126,9 @@ export function resolveContextPagingSettings(
 	const explicitTarget = readTokenSetting(projectSettings, "trimToTokens")
 		?? readTokenSetting(sources.globalSettings, "trimToTokens");
 	const modelOverrides = new Map<string, ContextPagingModelOverride>();
-	readModelOverrides(sources.globalSettings, modelOverrides);
-	readModelOverrides(projectSettings, modelOverrides);
+	const settingProblems: string[] = [];
+	readModelOverrides(sources.globalSettings, "global", modelOverrides, settingProblems);
+	readModelOverrides(projectSettings, "project", modelOverrides, settingProblems);
 	return {
 		enabled: readEnabledSetting(projectSettings)
 			?? readEnabledSetting(sources.globalSettings)
@@ -114,5 +137,6 @@ export function resolveContextPagingSettings(
 		trimToTokens: explicitTarget ?? defaultTrimToTokens(tokenBudget),
 		trimToTokensExplicit: explicitTarget !== undefined,
 		modelOverrides,
+		settingProblems,
 	};
 }

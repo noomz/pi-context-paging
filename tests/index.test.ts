@@ -1543,3 +1543,38 @@ test("names a model override in status only when it sets enabled", async () => {
 		"Context paging is disabled for a/off by its model override.",
 	]);
 });
+
+test("warns once about model overrides that do not apply", async () => {
+	const harness = createHarness({
+		globalSettings: {
+			contextPaging: {
+				modelOverrides: {
+					"a/known": { enabled: false },
+					"openrouter/deep/seek": { enabled: false },
+					"a/typo": { enabled: false },
+					"a/bad": { enabled: "no" },
+				},
+			},
+		},
+		projectTrusted: false,
+	});
+	const known = new Set(["a/known", "openrouter/deep/seek", "a/bad"]);
+	(harness.ctx as any).modelRegistry = { find: (provider: string, id: string) => known.has(`${provider}/${id}`) ? {} : undefined };
+	await emit(harness, "session_start", { reason: "startup" });
+	await emit(harness, "session_start", { reason: "resume" });
+	const warnings = harness.notifications.filter((item) => item.level === "warning");
+	assert.deepEqual(warnings.map((item) => item.message), [
+		"Context paging ignores these settings:\n"
+			+ '- global contextPaging.modelOverrides["a/bad"].enabled must be true or false.\n'
+			+ '- contextPaging.modelOverrides["a/typo"] does not match a known provider/modelId.',
+	]);
+});
+
+test("does not warn about model override keys without a model registry", async () => {
+	const harness = createHarness({
+		globalSettings: { contextPaging: { modelOverrides: { "a/typo": { enabled: false } } } },
+		projectTrusted: false,
+	});
+	await emit(harness, "session_start", { reason: "startup" });
+	assert.deepEqual(harness.notifications, []);
+});
