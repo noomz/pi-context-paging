@@ -87,7 +87,7 @@ export function replayFacades(input: ReplayInputs): { at<T extends object>(root:
 			const expected = input.reads[cursor];
 			if (!expected || expected.path !== path) throw new Error("Replay host-read mismatch");
 			// The handler calls known methods; other captured values are properties.
-			if (/\.(?:get\w+|is\w+|hasPendingMessages|buildSessionProjection|buildContextEntries)$/.test(path)) return (...args: unknown[]) => next(path, args);
+			if (/\.(?:get\w+|is\w+|hasPendingMessages|buildSessionProjection|buildContextEntries)$|^ctx\.modelRegistry\.find$/.test(path)) return (...args: unknown[]) => next(path, args);
 			return next(path, []);
 		},
 	});
