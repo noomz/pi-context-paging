@@ -1577,3 +1577,48 @@ test("does not warn about model override keys without a model registry", async (
 	await emit(harness, "session_start", { reason: "startup" });
 	assert.deepEqual(harness.notifications, []);
 });
+
+function modelOverrideFixture(override: Record<string, unknown>, contextPaging: Record<string, unknown> = { tokenBudget: 1_000 }) {
+	const fixture = resetFixture();
+	const model = { provider: "p", id: "m", contextWindow: 64_000 };
+	fixture.harness.ctx.model = model as any;
+	return { ...fixture, model, harness: createHarness({
+		globalSettings: { contextPaging: { enabled: true, ...contextPaging, modelOverrides: { "p/m": override } } }, projectTrusted: false,
+	}) };
+}
+
+async function selectModel(harness: ReturnType<typeof createHarness>, model: object) {
+	harness.ctx.model = model as any;
+	await emit(harness, "model_select", { model });
+}
+
+test("rotate accepts a target between the top-level budget and the model budget", async () => {
+	const { harness, model } = modelOverrideFixture({ tokenBudget: 2_000 });
+	await selectModel(harness, model);
+	await runPagingCommand(harness, "rotate 1500");
+	assert.equal(harness.notifications.at(-1)!.level, "info");
+	assert.match(harness.notifications.at(-1)!.message, /rotate to 1,500 tokens/);
+});
+
+test("rotate trims to the model target when no target is given", async () => {
+	const fixture = modelOverrideFixture({ trimToTokens: 200 });
+	const { harness, model, messages } = fixture;
+	harness.setBranch(messages.map((message, index) => entry(`reset-${index}`, message)));
+	harness.ctx.getSystemPrompt = () => "system";
+	await selectModel(harness, model);
+	await runPagingCommand(harness, "rotate");
+	const rotated = await emit(harness, "context", { messages }) as any;
+	assert.equal(hasMarker(rotated.messages, "RESET_C request"), false, "the top-level 625-token target would keep RESET_C");
+});
+
+test("the headroom warning names the active model's budget and target", async () => {
+	const { harness, model, messages } = modelOverrideFixture(
+		{ tokenBudget: 1_000, trimToTokens: 1_000 }, { tokenBudget: 128_000, trimToTokens: 80_000 },
+	);
+	harness.setBranch(messages.map((message, index) => entry(`reset-${index}`, message)));
+	await selectModel(harness, model);
+	await emit(harness, "context", { messages });
+	assert.deepEqual(harness.notifications.filter((item) => item.level === "warning").map((item) => item.message), [
+		"Context paging tokenBudget=1000, trimToTokens=1000 leaves no headroom. A smaller trimToTokens restores room between cuts.",
+	]);
+});

@@ -205,3 +205,15 @@ test("lets a session command beat the model override until the next session star
 	assert.deepEqual(await harness.at(deepseek, "model_select"), { status: "paging on", compaction: { cancel: true } });
 	assert.deepEqual(await harness.at(deepseek, "session_start"), { status: "paging off", compaction: undefined });
 });
+
+test("a failed settings load drops an earlier model override that enabled paging", async (t) => {
+	const path = await settingsFile(t);
+	await writeFile(path, JSON.stringify({ contextPaging: { enabled: false, modelOverrides: { "p/m": { enabled: true } } } }));
+	const harness = statusHarness();
+	Object.assign(harness.ctx, { model: { provider: "p", id: "m" } });
+	await harness.emit("session_start");
+	assert.equal(harness.statuses.get("context-paging"), "paging on");
+	await writeFile(path, "{");
+	await assert.rejects(() => harness.emit("session_start", { reason: "reload" }), SyntaxError);
+	assert.equal(harness.statuses.get("context-paging"), "paging off");
+});
