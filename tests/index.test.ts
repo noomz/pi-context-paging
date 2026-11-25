@@ -107,6 +107,7 @@ function createHarness(settings: Settings | null = { globalSettings: {}, project
 		getContextUsage: () => contextUsage,
 		isProjectTrusted: () => false,
 		model: { contextWindow: 64_000 },
+		modelRegistry: { find: (_provider: string, _id: string): object | undefined => ({}) },
 		ui: { notify: (message: string, level: string) => notifications.push({ message, level }) },
 		abort: () => { aborts++; },
 	};
@@ -1559,7 +1560,7 @@ test("warns at session start about model overrides that do not apply", async () 
 		projectTrusted: false,
 	});
 	const known = new Set(["a/known", "openrouter/deep/seek", "a/bad"]);
-	(harness.ctx as any).modelRegistry = { find: (provider: string, id: string) => known.has(`${provider}/${id}`) ? {} : undefined };
+	harness.ctx.modelRegistry = { find: (provider: string, id: string) => known.has(`${provider}/${id}`) ? {} : undefined };
 	await emit(harness, "session_start", { reason: "startup" });
 	const warnings = harness.notifications.filter((item) => item.level === "warning");
 	assert.deepEqual(warnings.map((item) => item.message), [
@@ -1567,15 +1568,6 @@ test("warns at session start about model overrides that do not apply", async () 
 			+ '- global contextPaging.modelOverrides["a/bad"].enabled must be true or false.\n'
 			+ '- contextPaging.modelOverrides["a/typo"] does not match a known provider/modelId.',
 	]);
-});
-
-test("does not warn about model override keys without a model registry", async () => {
-	const harness = createHarness({
-		globalSettings: { contextPaging: { modelOverrides: { "a/typo": { enabled: false } } } },
-		projectTrusted: false,
-	});
-	await emit(harness, "session_start", { reason: "startup" });
-	assert.deepEqual(harness.notifications, []);
 });
 
 function modelOverrideFixture(override: Record<string, unknown>, contextPaging: Record<string, unknown> = { tokenBudget: 1_000 }) {

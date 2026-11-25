@@ -17,6 +17,7 @@ function statusHarness(settings?: ContextPagingSettingsSources) {
 		hasUI: true,
 		cwd: tmpdir(),
 		isProjectTrusted: () => false,
+		modelRegistry: { find: () => ({}) },
 		sessionManager: {
 			getBranch: () => [],
 			buildSessionProjection: () => ({ messages: [] }),

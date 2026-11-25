@@ -158,14 +158,11 @@ export default function contextPagingExtension(
 	// Pi creates a new extension instance for each session, so each session warns once.
 	const warnAboutSettingProblems = (ctx: ExtensionContext) => {
 		const problems = [...resolvedSettings.settingProblems];
-		const registry = ctx.modelRegistry as ExtensionContext["modelRegistry"] | undefined;
-		if (registry) {
-			for (const modelKey of resolvedSettings.modelOverrides.keys()) {
-				const slash = modelKey.indexOf("/");
-				const known = slash > 0 && registry.find(modelKey.slice(0, slash), modelKey.slice(slash + 1)) !== undefined;
-				if (!known) {
-					problems.push(`contextPaging.modelOverrides[${JSON.stringify(modelKey)}] does not match a known provider/modelId.`);
-				}
+		for (const modelKey of resolvedSettings.modelOverrides.keys()) {
+			const slash = modelKey.indexOf("/");
+			const known = slash > 0 && ctx.modelRegistry.find(modelKey.slice(0, slash), modelKey.slice(slash + 1)) !== undefined;
+			if (!known) {
+				problems.push(`contextPaging.modelOverrides[${JSON.stringify(modelKey)}] does not match a known provider/modelId.`);
 			}
 		}
 		const message = problems.map((problem) => `- ${problem}`).join("\n");
